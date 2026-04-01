@@ -9,11 +9,14 @@ This file documents the default sources used by the `ai-news` skill. Edit `fetch
 | Hugging Face Blog | https://huggingface.co/blog/feed.xml | Model releases, research, tutorials |
 | VentureBeat AI | https://venturebeat.com/category/ai/feed/ | Industry news, funding, products |
 | The Verge AI | https://www.theverge.com/rss/ai-artificial-intelligence/index.xml | Consumer AI, policy, culture |
-| MIT Tech Review AI | https://www.technologyreview.com/feed/ | Research-leaning tech journalism |
+| MIT Tech Review AI | https://www.technologyreview.com/topic/artificial-intelligence/feed/ | Research-leaning tech journalism |
 | Ars Technica AI | https://feeds.arstechnica.com/arstechnica/index | Technical depth, policy |
-| OpenAI Blog | https://openai.com/blog/rss/ | First-party OpenAI announcements |
-| Google DeepMind Blog | https://deepmind.google/blog/rss.xml | First-party DeepMind research |
-| Anthropic News | https://www.anthropic.com/rss.xml | First-party Anthropic announcements |
+| OpenAI News | https://openai.com/news/rss.xml | First-party OpenAI announcements |
+| Google AI Blog | https://blog.google/technology/ai/rss/ | First-party Google AI announcements |
+| Anthropic News | https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml | Community-maintained (Anthropic has no native RSS) |
+| Simon Willison | https://simonwillison.net/atom/everything/ | LLM tooling, prompt engineering, practical AI |
+| Lilian Weng | https://lilianweng.github.io/index.xml | Deep research posts (OpenAI) |
+| Latent Space | https://www.latent.space/feed | AI engineering podcast/newsletter |
 
 ### Adding More RSS Feeds
 
@@ -33,8 +36,14 @@ Fetched via YouTube's public channel RSS feed (no API key required):
 | Yannic Kilcher | UCZHmQk67mSJgfCCTn7xBfew | Paper walkthroughs, ML research deep dives |
 | Two Minute Papers | UCbfYPyITQ-7l4upoX8nvctg | Research paper summaries |
 | AI Explained | UCNJ1Ymd5yFuUPtn21xtRbbw | Accessible AI news and model breakdowns |
-| Matthew Berman | UCQgB5j8JONFTGRlCyxgUoqw | AI tools, product launches, demos |
-| Andrej Karpathy | UCXUPKJO5MZQRRJECM5OI9ZA | Deep technical ML education |
+| Matthew Berman | UCzi5kcwU8aT4aLR7LcYhfWQ | AI tools, product launches, demos |
+| Andrej Karpathy | UCXUPKJO5MZQN11PqgIvyuvQ | Deep technical ML education |
+| Dwarkesh Patel | UCXl4i9dYBrFOabk0xGmbkRA | Long-form AI/tech interviews |
+| Fireship | UCsBjURrPoezykLs9EqgamOA | Fast-paced dev/AI news |
+| David Ondrej | UCPGrgwfbkjTIgPoOh2q1BAg | AI news and tool roundups |
+| 3Blue1Brown | UCYO_jab_esuFRV4b17AJtAw | Math/ML visualizations |
+
+**Note**: YouTube RSS feeds can go down transiently (all channels 404'd on 2026-03-30 evening, recovered by morning). Errors from YouTube are safe to ignore if temporary.
 
 ### Finding Channel IDs
 

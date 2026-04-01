@@ -19,11 +19,14 @@ const RSS_FEEDS = [
   { name: "Hugging Face Blog",    url: "https://huggingface.co/blog/feed.xml" },
   { name: "VentureBeat AI",       url: "https://venturebeat.com/category/ai/feed/" },
   { name: "The Verge AI",         url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml" },
-  { name: "MIT Tech Review AI",   url: "https://www.technologyreview.com/feed/" },
+  { name: "MIT Tech Review AI",   url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/" },
   { name: "Ars Technica AI",      url: "https://feeds.arstechnica.com/arstechnica/index" },
-  { name: "OpenAI Blog",          url: "https://openai.com/blog/rss/" },
-  { name: "Google DeepMind Blog", url: "https://deepmind.google/blog/rss.xml" },
-  { name: "Anthropic News",       url: "https://www.anthropic.com/rss.xml" },
+  { name: "OpenAI News",          url: "https://openai.com/news/rss.xml" },
+  { name: "Google AI Blog",       url: "https://blog.google/technology/ai/rss/" },
+  { name: "Anthropic News",       url: "https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml" },
+  { name: "Simon Willison",       url: "https://simonwillison.net/atom/everything/" },
+  { name: "Lilian Weng",          url: "https://lilianweng.github.io/index.xml" },
+  { name: "Latent Space",         url: "https://www.latent.space/feed" },
 ];
 
 // YouTube channel IDs — channel RSS requires no API key
@@ -31,8 +34,12 @@ const YOUTUBE_CHANNELS = [
   { name: "Yannic Kilcher",    channelId: "UCZHmQk67mSJgfCCTn7xBfew" },
   { name: "Two Minute Papers", channelId: "UCbfYPyITQ-7l4upoX8nvctg" },
   { name: "AI Explained",      channelId: "UCNJ1Ymd5yFuUPtn21xtRbbw" },
-  { name: "Matthew Berman",    channelId: "UCQgB5j8JONFTGRlCyxgUoqw" },
-  { name: "Andrej Karpathy",   channelId: "UCXUPKJO5MZQRRJECM5OI9ZA" },
+  { name: "Matthew Berman",    channelId: "UCzi5kcwU8aT4aLR7LcYhfWQ" },
+  { name: "Andrej Karpathy",   channelId: "UCXUPKJO5MZQN11PqgIvyuvQ" },
+  { name: "Dwarkesh Patel",    channelId: "UCXl4i9dYBrFOabk0xGmbkRA" },
+  { name: "Fireship",          channelId: "UCsBjURrPoezykLs9EqgamOA" },
+  { name: "David Ondrej",      channelId: "UCPGrgwfbkjTIgPoOh2q1BAg" },
+  { name: "3Blue1Brown",       channelId: "UCYO_jab_esuFRV4b17AJtAw" },
 ];
 
 // ── Types ──────────────────────────────────────────────────────────────────────
