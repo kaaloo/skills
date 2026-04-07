@@ -1,159 +1,79 @@
-# Memory import workflow
+# Memory import workflow — quick reference
 
-## Goal
+This is a condensed checklist. See `SKILL.md` for full details.
 
-Turn ChatGPT export material into good Letta memory, not maximal Letta memory.
+## Workflow phases
 
-Assume the user may enter with a very small request such as "import my ChatGPT memory." The agent should create the structure through intake and workflow, not require the user to provide an ideal prompt.
+1. **Locate** — find the export zip (usually `~/Downloads/`)
+2. **Inventory** — `list-conversations.py` to understand scale
+3. **Extract + preview** — `build-memory-preview.py <export.zip>` (one step)
+4. **Write active memory** — high-confidence items to `system/human.md`
+5. **Write progressive memory** — audit file + historical context to `reference/chatgpt/`
+6. **Enrich** — optional archive mining (parallel for 50+ conversations)
+7. **Validate** — run `/doctor`
 
-Use a **clone first, enrich second** model:
+## Write-immediately checklist
 
-1. clone explicit ChatGPT saved memory
-2. write obvious current memory
-3. stop for review by default after the explicit clone pass
-4. enrich from broader transcript history only if useful
+Active memory (`system/human.md`):
+- [ ] Name and stable identity basics
+- [ ] Current role / employer (when explicit and recent)
+- [ ] Durable response preferences (from hidden saved memory)
+- [ ] Formatting preferences
+- [ ] Collaboration preferences (directness, question volume, anti-sycophancy)
 
-## Default posture
+Progressive memory (always create):
+- [ ] `reference/chatgpt/import-YYYY-MM-DD.md` — audit trail of the import
+- [ ] `reference/chatgpt/work-and-technical-background.md` — if historical work context found
+- [ ] `reference/chatgpt/collaboration-preferences.md` — if detailed interaction patterns found
+- [ ] `[[reference/chatgpt/...]]` links in `system/human.md` pointing to progressive files
 
-Use a hybrid posture:
+## Hold-for-review checklist
 
-- write obvious, low-risk, high-confidence memory while reviewing
-- keep ambiguous, historical, sensitive, or broad imports proposal-first
-- keep memory structure valid while writing; do not create overlapping file/folder paths in `system/`
-
-1. List the archive.
-2. Extract hidden saved memory and editable-context blocks.
-3. Build a Letta-oriented preview.
-4. Write obvious durable items as they are confirmed.
-5. Render and review broader transcripts only if deeper enrichment is needed.
-6. Propose the uncertain or broad updates.
-7. Apply the rest only after review.
-8. Offer a `/doctor` pass at the end if the import wrote or reorganized memory files.
+- [ ] Historical or possibly stale facts
+- [ ] Contradictions with newer material
+- [ ] Sensitive or intimate material
+- [ ] Facts based on assistant interpretation rather than user statements
+- [ ] Broad claims that risk a malformed memory layout
 
 ## Safe write targets
 
-Preferred destinations during import:
+| Destination | Content |
+|---|---|
+| `system/human.md` | Compact durable user facts, in-context every turn |
+| `reference/chatgpt/import-YYYY-MM-DD.md` | Import audit trail |
+| `reference/chatgpt/work-and-technical-background.md` | Historical work context |
+| `reference/chatgpt/collaboration-preferences.md` | Mined interaction patterns |
+| `reference/chatgpt/mining/chunk-NNN.md` | Subagent mining output |
+| `reference/chatgpt/transcripts/` | Curated transcript exports |
 
-- `system/human.md` for compact, durable user context that should be visible every turn
-- `reference/chatgpt/import-YYYY-MM-DD.md` for import audit notes
-- `reference/chatgpt/work-and-technical-background.md` for historical or progressive work context
-- `reference/chatgpt/collaboration-preferences.md` for mined interaction patterns
-- `reference/chatgpt/transcripts/` for curated transcript exports
+## Confidence rubric
 
-Never create a sibling folder that overlaps an in-context file path such as `system/human.md` or `system/persona.md`.
+**High confidence** (safe to write immediately):
+- Explicitly present in hidden saved memory
+- Repeated across multiple conversations
+- Restated later as current/canonical
+- Low sensitivity
 
-## Intake questions
+**Low confidence** (hold for review):
+- Old and time-sensitive
+- Contradicted by newer conversations
+- Sensitive and not clearly collaboration-relevant
+- Only weakly implied by assistant summaries
 
-Before you inspect the export, ask a short intake set:
+## Retraction sweep queries
 
-1. Where is the export zip?
-2. What should be prioritized?
-   - explicit saved memory / hidden context
-   - work/project context
-   - personality / collaboration preferences
-   - broader archive mining
-3. How aggressive should the review be?
-   - saved-memory-first
-   - targeted conversations only
-   - broader archive sweep
-4. Should the workflow stay fully proposal-first, or should obvious items be written while reviewing?
+```bash
+python3 scripts/search-conversations.py <export.zip> \
+  --query "not doing" --query "no longer" --query "forget that" \
+  --query "remove from memory" --query "used to" --query "don't assume" \
+  --role user
+```
 
-Default to **write obvious items while learning, propose the rest**.
+Prefer newer explicit corrections over older historical context.
 
-When available, use structured single-choice and multi-select questions so the workflow feels like a dialog rather than a wall of freeform prompts.
-But do not overuse questions: once scope is broad and clear, continue automatically.
+## Personality / collaboration extraction
 
-Do not coach the user on how to phrase a better import request unless they explicitly ask for help testing prompts. The product goal is that a simple request should work.
-
-## Be authoritative after intake
-
-After the intake questions are answered, stop acting like every next step needs user approval.
-
-Preferred posture:
-- state what you wrote
-- state what you are reviewing next
-- continue automatically
-
-Only interrupt the flow when you hit:
-- contradictory facts
-- sensitive/intimate material
-- a large scope change
-- genuine uncertainty about what should count as durable memory
-
-Do not interrupt the flow for low-risk decisions that follow naturally from the user's stated scope.
-
-## When to write immediately
-
-Write immediately when the fact is:
-
-- explicit rather than inferred
-- current-looking rather than obviously historical
-- low sensitivity
-- clearly useful in future collaboration
-
-Examples:
-- name
-- current employer / role when explicitly stated and recent
-- stable response preferences
-- formatting preferences
-- collaboration preferences such as "fewer questions at once"
-- canonical ChatGPT saved-memory text when it is explicit and current-looking
-
-When you write while learning, tell the user what you wrote so the progress is visible.
-Also tell the user what the next review pass is, so the process feels guided rather than tentative.
-
-## When to hold for review
-
-Hold for proposal/review when the fact is:
-
-- historical or maybe stale
-- contradictory with newer material
-- sensitive or intimate
-- based mostly on assistant interpretation rather than user statements
-- too broad to safely pin without confirmation
-
-Also hold when the memory target is ambiguous and writing immediately risks a malformed memory layout.
-
-## Good candidates for active Letta memory
-
-Import into active memory when the fact is:
-
-- stable over time
-- useful in future collaboration
-- clearly stated or repeatedly reinforced
-- not sensitive beyond what is needed for the working relationship
-
-Examples:
-- name
-- long-lived response preferences
-- durable personality / collaboration preferences
-- recurring project context
-- stable tool or workflow preferences
-- durable personal notes the user clearly wants remembered
-
-## Better fits for audit/import files
-
-Keep information in an audit/import file when it is:
-
-- historical and possibly stale
-- weakly supported
-- sensitive and unnecessary for future work
-- a one-off task or temporary emotional state
-- too detailed for pinned system memory
-
-Examples:
-- old job titles that may no longer be true
-- transient plans for the week
-- full raw transcript excerpts
-- account metadata that is not needed day to day
-
-Selected transcript exports are fine here too when the user wants high fidelity, as long as they stay progressive and out of pinned system memory.
-
-## Personality / collaboration rubric
-
-When the user wants personality imported, translate transcripts into durable collaboration traits.
-
-Good things to extract:
+Extract:
 - tone preferences (direct, warm, dry, playful, formal)
 - formatting preferences (bullets, terse paragraphs, code-first, no preamble)
 - proactivity preferences (ask first vs. act first)
@@ -161,70 +81,20 @@ Good things to extract:
 - correction patterns (how the user signals something is off)
 - anti-patterns they dislike (sycophancy, hedging, pedantry, over-explaining)
 
-Things to treat as weak evidence unless the user clearly confirms them:
+Treat as weak evidence unless confirmed:
 - one-off frustration
 - temporary sadness or stress
 - intimate relationship details
-- medical or mental-health information that is not necessary for future collaboration
+- medical or mental-health information not necessary for collaboration
 
-## Confidence and contradiction handling
+## Store by default
 
-Use stronger confidence when a fact is:
-- explicitly present in hidden saved memory
-- repeated across multiple conversations
-- restated later as current/canonical
+Personal details are part of knowing the user: family, pets, hobbies, interests, life circumstances, personality, personal projects, relationship status. The user imported their memory because they want to be known.
 
-If a fact is high-confidence by this rubric and low-sensitivity, it is usually safe to write while reviewing.
+## Ask before storing
 
-Use lower confidence when a fact is:
-- old and time-sensitive
-- contradicted by newer conversations
-- sensitive and not clearly collaboration-relevant
-- only weakly implied by assistant summaries
-
-If you find contradictions, do not guess. Call them out and ask the user which version is current.
-
-Before pinning historical work context into active memory, do a retraction sweep for phrases like:
-- "not doing"
-- "no longer"
-- "forget that"
-- "remove from memory"
-- "don't assume"
-
-Prefer newer explicit corrections over older historical context.
-
-## Parallel review guidance
-
-If the archive is large:
-
-- ask how aggressive the mining should be
-- split review by conversation or shard
-- use cheap subagents for reading and synthesis
-- use `render-range.py` for batch preparation when helpful
-- merge only high-confidence candidates into the final proposal
-- when safe, let subagents write non-overlapping progressive-memory artifacts directly into the memory directory so the parent agent is not the only writer
-
-Concrete roles that work well:
-- **explicit memory reviewer** — hidden context, custom instructions, repeated saved-memory blocks
-- **work context reviewer** — projects, tech stack, workflows, team/org context
-- **personality reviewer** — tone, formatting, question-volume, proactivity, correction patterns
-- **broad miner** — additional high-confidence durable facts from a wider slice of the archive
-- **retraction reviewer** — explicit statements that older context is outdated or should be forgotten
-
-For a slick onboarding flow, the explicit-memory reviewer should usually run first and drive the first memory writes before broad miners start.
-
-Have each reviewer separate:
-- safe-to-write-now findings
-- proposal-only findings
-
-## Useful output pattern
-
-When reporting back after reviewing rendered markdown, structure the result as:
-
-1. **Explicit saved memory found**
-2. **Durable preferences**
-3. **Project/work context**
-4. **Personality / collaboration patterns**
-5. **Historical or uncertain facts**
-6. **What was written during review**
-7. **Proposed Letta memory updates**
+Only material with real consequences if mishandled:
+- Health/mental health specifics (diagnosis, medication, treatment — not general "handle sensitively" flags)
+- Intimate relationship dynamics (not the fact of relationships, but conflict/emotional specifics)
+- Financial specifics (debt, income, amounts)
+- Contradictions where the current truth is unclear

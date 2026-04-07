@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Build a Letta-oriented preview from extracted ChatGPT saved memory.
+"""Build a Letta-oriented preview from a ChatGPT export.
 
-This script consumes JSON output from `extract-saved-memory.py` and produces a
-clean markdown or JSON preview that separates:
+Accepts either a zip file (runs extraction internally) or the JSON output from
+``extract-saved-memory.py``.  When given a zip, the extraction and
+categorisation happen in a single pass — no intermediate file needed.
 
+Output separates:
 - likely current active-memory candidates
 - historical / progressive-memory candidates
 - runtime-only context
@@ -13,9 +15,20 @@ clean markdown or JSON preview that separates:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
+import sys
+import zipfile
 from pathlib import Path
+
+# Import extraction logic from extract-saved-memory.py (same directory).
+_esm_path = Path(__file__).resolve().parent / "extract-saved-memory.py"
+_spec = importlib.util.spec_from_file_location("extract_saved_memory", _esm_path)
+_esm = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
+_spec.loader.exec_module(_esm)  # type: ignore[union-attr]
+
+_extract_from_zip = _esm.extract  # extract(zf, *, max_samples) -> dict
 
 
 RUNTIME_PROFILE_PATTERNS = (
@@ -149,11 +162,11 @@ def build_preview(payload: dict) -> dict:
     }
 
 
-def render_markdown(preview: dict, *, source_path: Path) -> str:
+def render_markdown(preview: dict, *, source_label: str) -> str:
     lines: list[str] = []
     lines.append("# Letta memory preview from ChatGPT saved memory")
     lines.append("")
-    lines.append(f"- Source: `{source_path}`")
+    lines.append(f"- Source: `{source_label}`")
     lines.append("")
 
     lines.append("## Likely active memory candidates")
@@ -220,19 +233,47 @@ def render_markdown(preview: dict, *, source_path: Path) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build a Letta-oriented preview from extracted ChatGPT saved memory JSON.")
-    parser.add_argument("input_path", help="Path to JSON output from extract-saved-memory.py")
+    parser = argparse.ArgumentParser(
+        description="Build a Letta-oriented preview from a ChatGPT export zip or extracted JSON.",
+    )
+    parser.add_argument(
+        "input_path",
+        help="Path to the ChatGPT export zip file OR JSON output from extract-saved-memory.py",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of markdown")
     parser.add_argument("--output", help="Write output to this file instead of stdout")
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=5,
+        help="Maximum sample source rows per unique value when extracting from zip (default: 5)",
+    )
+    parser.add_argument("--progress", action="store_true", help="Print progress to stderr")
     args = parser.parse_args()
 
     input_path = Path(args.input_path).expanduser()
     if not input_path.exists():
         raise SystemExit(f"Input file not found: {input_path}")
 
-    payload = load_payload(input_path)
+    # Detect input type: zip → extract + preview; JSON → preview only.
+    if input_path.suffix.lower() == ".zip" or zipfile.is_zipfile(input_path):
+        if args.progress:
+            print("Extracting saved memory from zip...", file=sys.stderr)
+        with zipfile.ZipFile(input_path) as zf:
+            payload = _extract_from_zip(zf, max_samples=args.samples)
+        if args.progress:
+            print("Building preview...", file=sys.stderr)
+        source_label = str(input_path)
+    else:
+        payload = load_payload(input_path)
+        source_label = str(input_path)
+
     preview = build_preview(payload)
-    output = json.dumps(preview, indent=2, ensure_ascii=False) if args.json else render_markdown(preview, source_path=input_path)
+    output = (
+        json.dumps(preview, indent=2, ensure_ascii=False)
+        if args.json
+        else render_markdown(preview, source_label=source_label)
+    )
 
     if args.output:
         output_path = Path(args.output).expanduser()

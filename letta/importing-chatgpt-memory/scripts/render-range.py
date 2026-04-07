@@ -1,43 +1,26 @@
 #!/usr/bin/env python3
 """Render a range of ChatGPT export conversations.
 
-This stays intentionally procedural: it shells out to render-conversation.py for
-one conversation at a time instead of inventing a larger parsing framework.
+Opens the zip once and renders in-process instead of shelling out per
+conversation.  For a 50-conversation range this is ~50x fewer zip reads.
 """
 
 from __future__ import annotations
 
 import argparse
-import subprocess
+import importlib.util
 import sys
+import zipfile
 from pathlib import Path
 
+# Import rendering functions from render-conversation.py (same directory).
+_rc_path = Path(__file__).resolve().parent / "render-conversation.py"
+_spec = importlib.util.spec_from_file_location("render_conversation", _rc_path)
+_rc = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
+_spec.loader.exec_module(_rc)  # type: ignore[union-attr]
 
-def build_base_command(
-    render_script: Path,
-    zip_path: Path,
-    *,
-    skip_empty_hidden: bool,
-    compact_nontext: bool,
-    skip_empty_tool_messages: bool,
-    skip_thoughts: bool,
-    user_only: bool,
-    assistant_only: bool,
-) -> list[str]:
-    command = [sys.executable, str(render_script), str(zip_path)]
-    if skip_empty_hidden:
-        command.append("--skip-empty-hidden")
-    if compact_nontext:
-        command.append("--compact-nontext")
-    if skip_empty_tool_messages:
-        command.append("--skip-empty-tool-messages")
-    if skip_thoughts:
-        command.append("--skip-thoughts")
-    if user_only:
-        command.append("--user-only")
-    if assistant_only:
-        command.append("--assistant-only")
-    return command
+load_range = _rc.load_range
+render_markdown = _rc.render_markdown
 
 
 def main() -> None:
@@ -68,6 +51,7 @@ def main() -> None:
     role_filter = parser.add_mutually_exclusive_group()
     role_filter.add_argument("--user-only", action="store_true", help="Render only user messages")
     role_filter.add_argument("--assistant-only", action="store_true", help="Render only assistant messages")
+    parser.add_argument("--progress", action="store_true", help="Print progress to stderr")
 
     output_group = parser.add_mutually_exclusive_group(required=True)
     output_group.add_argument("--output-dir", help="Directory for one markdown file per conversation")
@@ -81,10 +65,7 @@ def main() -> None:
     if not zip_path.exists():
         raise SystemExit(f"Zip file not found: {zip_path}")
 
-    render_script = Path(__file__).resolve().parent / "render-conversation.py"
-    base_command = build_base_command(
-        render_script,
-        zip_path,
+    render_kwargs = dict(
         skip_empty_hidden=args.skip_empty_hidden,
         compact_nontext=args.compact_nontext,
         skip_empty_tool_messages=args.skip_empty_tool_messages,
@@ -93,27 +74,37 @@ def main() -> None:
         assistant_only=args.assistant_only,
     )
 
+    with zipfile.ZipFile(zip_path) as zf:
+        rows = load_range(zf, args.start_index, args.end_index)
+
+    total = len(rows)
+    if args.progress:
+        print(f"Loaded {total} conversations ({args.start_index}-{args.end_index})", file=sys.stderr)
+
     if args.output_dir:
         output_dir = Path(args.output_dir).expanduser()
         output_dir.mkdir(parents=True, exist_ok=True)
-        for index in range(args.start_index, args.end_index + 1):
-            output_path = output_dir / f"chatgpt-{index:04d}.md"
-            command = [*base_command, "--index", str(index), "--output", str(output_path)]
-            subprocess.run(command, check=True)
-        print(f"Wrote conversations {args.start_index}-{args.end_index} to {output_dir}")
+        for i, row in enumerate(rows, start=1):
+            output_path = output_dir / f"chatgpt-{row['index']:04d}.md"
+            markdown = render_markdown(row, **render_kwargs)
+            output_path.write_text(markdown, encoding="utf-8")
+            if args.progress:
+                print(f"Rendered {i}/{total}: {row['conversation'].get('title', '(untitled)')}", file=sys.stderr)
+        print(f"Wrote {total} conversations to {output_dir}")
         return
 
     concat_output = Path(args.concat_output).expanduser()
     concat_output.parent.mkdir(parents=True, exist_ok=True)
     chunks: list[str] = []
-    for index in range(args.start_index, args.end_index + 1):
-        command = [*base_command, "--index", str(index)]
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-        chunks.append(result.stdout.rstrip())
+    for i, row in enumerate(rows, start=1):
+        markdown = render_markdown(row, **render_kwargs)
+        chunks.append(markdown.rstrip())
+        if args.progress:
+            print(f"Rendered {i}/{total}: {row['conversation'].get('title', '(untitled)')}", file=sys.stderr)
 
     separator = "\n\n---\n\n"
     concat_output.write_text(separator.join(chunks) + "\n", encoding="utf-8")
-    print(f"Wrote conversations {args.start_index}-{args.end_index} to {concat_output}")
+    print(f"Wrote {total} conversations to {concat_output}")
 
 
 if __name__ == "__main__":
