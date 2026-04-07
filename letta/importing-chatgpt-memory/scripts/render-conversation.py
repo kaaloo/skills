@@ -103,64 +103,141 @@ def stringify_content(content: dict, *, compact_nontext: bool) -> str:
     return ""
 
 
-def load_rows(zf: zipfile.ZipFile) -> list[dict]:
-    rows: list[dict] = []
+# ---------------------------------------------------------------------------
+# Shard iteration and conversation lookup
+# ---------------------------------------------------------------------------
+
+
+def sorted_shard_names(zf: zipfile.ZipFile) -> list[str]:
+    """Return conversation-shard filenames in sorted order."""
+    return sorted(name for name in zf.namelist() if name.startswith("conversations-") and name.endswith(".json"))
+
+
+def _make_row(global_index: int, shard_name: str, shard_index: int, conversation: dict) -> dict:
+    return {
+        "index": global_index,
+        "shard": shard_name,
+        "shard_index": shard_index,
+        "conversation": conversation,
+    }
+
+
+def iter_conversations(zf: zipfile.ZipFile):
+    """Yield (global_index, shard_name, shard_index, conversation) without accumulating."""
     global_index = 0
-    shard_names = sorted(name for name in zf.namelist() if name.startswith("conversations-") and name.endswith(".json"))
-    for shard_name in shard_names:
+    for shard_name in sorted_shard_names(zf):
         conversations = json.loads(zf.read(shard_name))
         for shard_index, conversation in enumerate(conversations):
-            rows.append(
-                {
-                    "index": global_index,
-                    "shard": shard_name,
-                    "shard_index": shard_index,
-                    "conversation": conversation,
-                }
-            )
+            yield global_index, shard_name, shard_index, conversation
             global_index += 1
+
+
+def find_by_index(zf: zipfile.ZipFile, target_index: int) -> dict | None:
+    """Find a conversation by global index, skipping entire shards when possible."""
+    global_index = 0
+    for shard_name in sorted_shard_names(zf):
+        conversations = json.loads(zf.read(shard_name))
+        shard_len = len(conversations)
+        if global_index + shard_len <= target_index:
+            global_index += shard_len
+            continue
+        offset = target_index - global_index
+        return _make_row(target_index, shard_name, offset, conversations[offset])
+    return None
+
+
+def load_range(zf: zipfile.ZipFile, start_index: int, end_index: int) -> list[dict]:
+    """Load conversations in [start_index, end_index] without retaining others."""
+    rows: list[dict] = []
+    global_index = 0
+    for shard_name in sorted_shard_names(zf):
+        conversations = json.loads(zf.read(shard_name))
+        shard_len = len(conversations)
+        shard_end = global_index + shard_len - 1
+        if shard_end < start_index:
+            global_index += shard_len
+            continue
+        if global_index > end_index:
+            break
+        for shard_index, conversation in enumerate(conversations):
+            if start_index <= global_index <= end_index:
+                rows.append(_make_row(global_index, shard_name, shard_index, conversation))
+            global_index += 1
+            if global_index > end_index:
+                break
     return rows
 
 
-def choose_conversation(rows: list[dict], args: argparse.Namespace) -> dict:
-    if args.index is not None:
-        for row in rows:
-            if row["index"] == args.index:
-                return row
-        raise SystemExit(f"No conversation found at global index {args.index}")
+def load_all(zf: zipfile.ZipFile) -> list[dict]:
+    """Load all conversations. Use only when a full scan is needed."""
+    rows: list[dict] = []
+    for global_index, shard_name, shard_index, conversation in iter_conversations(zf):
+        rows.append(_make_row(global_index, shard_name, shard_index, conversation))
+    return rows
 
-    if args.id:
-        matches = [row for row in rows if row["conversation"].get("id") == args.id]
+
+def find_conversation(
+    zf: zipfile.ZipFile,
+    *,
+    index: int | None = None,
+    id: str | None = None,
+    conversation_id: str | None = None,
+    title_contains: str | None = None,
+) -> dict:
+    """Find a conversation by the first matching selector."""
+    if index is not None:
+        row = find_by_index(zf, index)
+        if row is None:
+            raise SystemExit(f"No conversation found at global index {index}")
+        return row
+
+    if id is not None:
+        matches = []
+        for gi, sn, si, conv in iter_conversations(zf):
+            if conv.get("id") == id:
+                matches.append(_make_row(gi, sn, si, conv))
         if len(matches) == 1:
             return matches[0]
         if not matches:
-            raise SystemExit(f"No conversation found with id {args.id}")
-        raise SystemExit(f"Found {len(matches)} conversations with id {args.id}; use --index instead")
+            raise SystemExit(f"No conversation found with id {id}")
+        raise SystemExit(f"Found {len(matches)} conversations with id {id}; use --index instead")
 
-    if args.conversation_id:
-        matches = [row for row in rows if row["conversation"].get("conversation_id") == args.conversation_id]
+    if conversation_id is not None:
+        matches = []
+        for gi, sn, si, conv in iter_conversations(zf):
+            if conv.get("conversation_id") == conversation_id:
+                matches.append(_make_row(gi, sn, si, conv))
         if len(matches) == 1:
             return matches[0]
         if not matches:
-            raise SystemExit(f"No conversation found with conversation_id {args.conversation_id}")
+            raise SystemExit(f"No conversation found with conversation_id {conversation_id}")
         raise SystemExit(
-            f"Found {len(matches)} conversations with conversation_id {args.conversation_id}; use --index instead"
+            f"Found {len(matches)} conversations with conversation_id {conversation_id}; use --index instead"
         )
 
-    matches = [
-        row for row in rows if args.title_contains.lower() in (row["conversation"].get("title") or "").lower()
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    if not matches:
-        raise SystemExit(f"No conversation title contains {args.title_contains!r}")
+    if title_contains is not None:
+        matches = []
+        needle = title_contains.lower()
+        for gi, sn, si, conv in iter_conversations(zf):
+            if needle in (conv.get("title") or "").lower():
+                matches.append(_make_row(gi, sn, si, conv))
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise SystemExit(f"No conversation title contains {title_contains!r}")
+        preview = "\n".join(
+            f"  index={row['index']}  title={row['conversation'].get('title') or '(untitled)'}" for row in matches[:10]
+        )
+        raise SystemExit(
+            f"Found {len(matches)} matching titles for {title_contains!r}. Narrow the query or use --index.\n{preview}"
+        )
 
-    preview = "\n".join(
-        f"  index={row['index']}  title={row['conversation'].get('title') or '(untitled)'}" for row in matches[:10]
-    )
-    raise SystemExit(
-        f"Found {len(matches)} matching titles for {args.title_contains!r}. Narrow the query or use --index.\n{preview}"
-    )
+    raise SystemExit("No selector provided. Use --index, --id, --conversation-id, or --title-contains.")
+
+
+# ---------------------------------------------------------------------------
+# Message ordering and rendering
+# ---------------------------------------------------------------------------
 
 
 def ordered_message_nodes(conversation: dict) -> list[tuple[str, dict]]:
@@ -224,12 +301,12 @@ def should_render_message(
 def render_markdown(
     row: dict,
     *,
-    skip_empty_hidden: bool,
-    compact_nontext: bool,
-    skip_empty_tool_messages: bool,
-    skip_thoughts: bool,
-    user_only: bool,
-    assistant_only: bool,
+    skip_empty_hidden: bool = False,
+    compact_nontext: bool = False,
+    skip_empty_tool_messages: bool = False,
+    skip_thoughts: bool = False,
+    user_only: bool = False,
+    assistant_only: bool = False,
 ) -> str:
     conversation = row["conversation"]
     lines: list[str] = []
@@ -350,8 +427,13 @@ def main() -> None:
         raise SystemExit(f"Zip file not found: {zip_path}")
 
     with zipfile.ZipFile(zip_path) as zf:
-        rows = load_rows(zf)
-        row = choose_conversation(rows, args)
+        row = find_conversation(
+            zf,
+            index=args.index,
+            id=args.id,
+            conversation_id=args.conversation_id,
+            title_contains=args.title_contains,
+        )
         markdown = render_markdown(
             row,
             skip_empty_hidden=args.skip_empty_hidden,

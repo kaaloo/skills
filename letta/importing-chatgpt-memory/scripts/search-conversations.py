@@ -11,6 +11,7 @@ import argparse
 import datetime as dt
 import json
 import re
+import sys
 import zipfile
 from pathlib import Path
 
@@ -117,6 +118,12 @@ def main() -> None:
     parser.add_argument("--json", action="store_true", help="Emit matching rows as JSON instead of a table")
     parser.add_argument("--case-sensitive", action="store_true", help="Use case-sensitive matching")
     parser.add_argument("--include-title", action="store_true", help="Also search conversation titles")
+    parser.add_argument(
+        "--role",
+        action="append",
+        help="Only search messages from this role (user, assistant, tool, system). Repeat for multiple roles.",
+    )
+    parser.add_argument("--progress", action="store_true", help="Print progress to stderr")
     args = parser.parse_args()
 
     zip_path = Path(args.zip_path).expanduser()
@@ -129,15 +136,23 @@ def main() -> None:
 
     regex_flags = 0 if args.case_sensitive else re.IGNORECASE
     patterns = [(query, re.compile(re.escape(query), regex_flags)) for query in queries]
+    allowed_roles: set[str] | None = set(r.lower() for r in args.role) if args.role else None
 
     rows: list[dict] = []
+    conversation_count = 0
     for index, shard_name, shard_index, conversation in iter_conversations(zip_path):
+        conversation_count += 1
+        if args.progress and conversation_count % 100 == 0:
+            print(f"Searched {conversation_count} conversations...", file=sys.stderr)
         title = conversation.get("title") or "(untitled)"
         message_hits: list[dict] = []
         matched_queries: set[str] = set()
 
         for row in conversation_messages(conversation):
             message = row["message"]
+            role = ((message.get("author") or {}).get("role") or "unknown")
+            if allowed_roles is not None and role not in allowed_roles:
+                continue
             blob = build_search_blob(title, message, include_title=args.include_title)
             if not blob:
                 continue

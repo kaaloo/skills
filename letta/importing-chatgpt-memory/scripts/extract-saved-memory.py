@@ -19,8 +19,10 @@ import argparse
 import datetime as dt
 import json
 import re
+import sys
 import zipfile
 from pathlib import Path
+from typing import Callable
 
 
 FIELDS = (
@@ -109,12 +111,19 @@ def iter_messages(conversation: dict):
             yield node_id, message
 
 
-def extract(zf: zipfile.ZipFile, *, max_samples: int) -> dict:
+def extract(
+    zf: zipfile.ZipFile,
+    *,
+    max_samples: int,
+    progress_fn: Callable[[int], None] | None = None,
+) -> dict:
     aggregates = {field: {} for field in FIELDS}
     field_occurrences = {field: 0 for field in FIELDS}
     other_user_context_fields: dict[str, int] = {}
 
     for row in iter_conversations(zf):
+        if progress_fn and row["index"] > 0 and row["index"] % 100 == 0:
+            progress_fn(row["index"])
         conversation = row["conversation"]
         title = conversation.get("title") or "(untitled)"
         conversation_ts = conversation.get("update_time") or conversation.get("create_time")
@@ -273,14 +282,17 @@ def main() -> None:
     parser.add_argument("--samples", type=int, default=5, help="Maximum sample source rows per unique value (default: 5)")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of markdown")
     parser.add_argument("--output", help="Write output to this file instead of stdout")
+    parser.add_argument("--progress", action="store_true", help="Print progress to stderr")
     args = parser.parse_args()
 
     zip_path = Path(args.zip_path).expanduser()
     if not zip_path.exists():
         raise SystemExit(f"Zip file not found: {zip_path}")
 
+    progress_fn = (lambda n: print(f"Scanned {n} conversations...", file=sys.stderr)) if args.progress else None
+
     with zipfile.ZipFile(zip_path) as zf:
-        payload = extract(zf, max_samples=args.samples)
+        payload = extract(zf, max_samples=args.samples, progress_fn=progress_fn)
 
     output = json.dumps({"zip_path": str(zip_path), **payload}, indent=2, ensure_ascii=False) if args.json else render_markdown(payload, zip_path=zip_path)
 
