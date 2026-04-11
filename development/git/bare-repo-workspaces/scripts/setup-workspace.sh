@@ -216,6 +216,10 @@ upgrade_standard_checkout_in_place() {
 
   set_branch_tracking_if_remote_exists "$workspace" "$main_branch"
 
+  # Restore bare HEAD to main branch — the placeholder confuses worktrunk (wt)
+  git -C "$workspace" symbolic-ref HEAD "refs/heads/$main_branch"
+  git -C "$workspace" branch -D __bare_placeholder__ 2>/dev/null || true
+
   echo "Restoring previous checkout contents into '$main_branch/'..."
   restore_backup_into_main "$backup_dir" "$workspace/$main_branch"
 
@@ -325,6 +329,10 @@ run_fresh_setup_mode() {
   echo "Creating '$main_branch' worktree..."
   git worktree add "$main_branch" "$main_branch"
   set_branch_tracking_if_remote_exists "$target_dir" "$main_branch"
+
+  # Restore bare HEAD to main branch — the placeholder confuses worktrunk (wt)
+  git symbolic-ref HEAD "refs/heads/$main_branch"
+  git branch -D __bare_placeholder__ 2>/dev/null || true
 
   local workspace main_dir
   workspace="$(pwd)"
